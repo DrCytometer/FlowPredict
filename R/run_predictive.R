@@ -12,7 +12,7 @@ MODEL.LABELS <- c( lasso = "Lasso logistic regression",
                    random.forest = "Random forest" )
 RF.DEPTHS <- c( 2, 4, 0 )
 RF.TREES <- 300
-LASSO.N.LAMBDA <- 50
+LASSO.C.GRID <- 10^seq( -2, 2, length.out = 15 )
 ROC.GRID <- seq( 0, 1, length.out = 101 )
 PANEL.SIZES <- c( 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200 )
 
@@ -304,35 +304,38 @@ class.weights <- function( y ) {
 }
 
 
-# Lasso logistic regression: penalty chosen by mean inner-fold AUC
-# (largest penalty among ties); covariate columns (the last n.cov) are not
-# penalised.
+# Lasso logistic regression with balanced class weights over the inverse
+# penalty grid LASSO.C.GRID (C as in scikit-learn: minimise
+# C * sum(w * log loss) + |beta|_1, i.e. glmnet lambda = 1 / (C * n) for n
+# training samples). C is chosen by mean inner-fold AUC (smallest C, the
+# strongest penalty, among ties); covariate columns (the last n.cov) are
+# not penalised.
 fit.lasso <- function( X, y, inner, n.cov = 0L ) {
   pf <- c( rep( 1, ncol( X ) - n.cov ), rep( 0, n.cov ) )
-  pp <- fit.preprocess( X )
-  Xs <- apply.preprocess( pp, X )
-  w <- class.weights( y )
-  path <- glmnet::glmnet( Xs, y, family = "binomial", alpha = 1, weights = w,
-                          standardize = FALSE, nlambda = LASSO.N.LAMBDA,
-                          penalty.factor = pf )
-  lambda <- path$lambda
-  fold.auc <- matrix( NA_real_, max( inner ), length( lambda ) )
+  fit.path <- function( Xtr, ytr ) {
+    lambda <- 1 / ( LASSO.C.GRID * length( ytr ) )
+    fit <- glmnet::glmnet( Xtr, ytr, family = "binomial", alpha = 1,
+                           weights = class.weights( ytr ), standardize = FALSE,
+                           lambda = sort( lambda, decreasing = TRUE ), penalty.factor = pf )
+    list( fit = fit, lambda = lambda )
+  }
+  fold.auc <- matrix( NA_real_, max( inner ), length( LASSO.C.GRID ) )
   for ( k in sort( unique( inner ) ) ) {
     itr <- which( inner != k ); ite <- which( inner == k )
     if ( length( unique( y[ itr ] ) ) < 2 || length( unique( y[ ite ] ) ) < 2 ) next
     ipp <- fit.preprocess( X[ itr, , drop = FALSE ] )
-    fit <- glmnet::glmnet( apply.preprocess( ipp, X[ itr, , drop = FALSE ] ), y[ itr ],
-                           family = "binomial", alpha = 1, weights = class.weights( y[ itr ] ),
-                           standardize = FALSE, lambda = lambda, penalty.factor = pf )
-    s <- stats::predict( fit, apply.preprocess( ipp, X[ ite, , drop = FALSE ] ),
-                         s = lambda, type = "response" )
+    inner.path <- fit.path( apply.preprocess( ipp, X[ itr, , drop = FALSE ] ), y[ itr ] )
+    s <- stats::predict( inner.path$fit, apply.preprocess( ipp, X[ ite, , drop = FALSE ] ),
+                         s = inner.path$lambda, type = "response" )
     fold.auc[ k, ] <- apply( s, 2, function( v ) roc.auc( y[ ite ], v ) )
   }
   mean.auc <- colMeans( fold.auc, na.rm = TRUE )
   mean.auc[ !is.finite( mean.auc ) ] <- -Inf
   best <- which( mean.auc == max( mean.auc ) )[ 1 ]
-  coef <- as.numeric( stats::coef( path, s = lambda[ best ] ) )[ -1 ]
-  list( preprocess = pp, path = path, lambda = lambda[ best ], coef = coef )
+  pp <- fit.preprocess( X )
+  path <- fit.path( apply.preprocess( pp, X ), y )
+  coef <- as.numeric( stats::coef( path$fit, s = path$lambda[ best ] ) )[ -1 ]
+  list( preprocess = pp, path = path$fit, lambda = path$lambda[ best ], coef = coef )
 }
 
 lasso.predict <- function( fit, X ) {
