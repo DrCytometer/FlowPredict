@@ -1,0 +1,44 @@
+Package: FlowPredict
+Title: Predictive Modelling of Groups and Immune Age from Cytometry Features
+Version: 0.1.0
+Authors@R: c(
+    person(
+      "Oliver", "Burton",
+      email = "olivertburton@gmail.com",
+      role = c("aut", "cre"),
+      comment = c( ORCID = "0000-0003-3884-7373" )
+    )
+  )
+Description:
+    Answers two questions about a table of per-sample cytometry features
+    (population frequencies, marker medians or any other numbers): which
+    small set of features best separates two groups of samples, and how
+    well; and how well the features predict a continuous variable such as
+    age ("immune age").  Group prediction uses lasso logistic regression
+    and random forests, evaluated by repeated, nested cross-validation, with
+    feature importance and the smallest panel of features that reaches near
+    the best performance.  The immune age model is an elastic net, evaluated
+    the same way, with each sample's age gap corrected for regression to the
+    mean and a permutation check against chance.  Folds can keep the samples
+    of one donor together.  The design follows the nested cross-validation
+    approach of Veiga et al. (2026, Nat Commun 17:4670), Humblet-Baron et al.
+    (2025, Alzheimer's Dement 21:e70952) and Gemander et al. (2025, npj
+    Vaccines 10:140), as implemented in the Honeychrome application.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Depends:
+    R (>= 4.1.0)
+Imports:
+    ggplot2 (>= 3.4.0),
+    glmnet (>= 4.1),
+    parallel,
+    ranger (>= 0.14),
+    stats,
+    utils
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+URL: https://github.com/DrCytometer/FlowPredict
+BugReports: https://github.com/DrCytometer/FlowPredict/issues
+RoxygenNote: 7.3.1
