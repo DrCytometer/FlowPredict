@@ -276,7 +276,7 @@ fit.age <- function( X, y, blocks, inner.folds, n.cov = 0L, bias = TRUE ) {
   for ( a in AGE.L1.RATIOS ) {
     cv <- glmnet::cv.glmnet( Xs, y, family = "gaussian", alpha = a, foldid = foldid,
                              nlambda = AGE.N.LAMBDA, standardize = FALSE,
-                             penalty.factor = pf, thresh = 1e-5 )
+                             penalty.factor = pf )
     err <- min( cv$cvm )
     if ( is.null( best ) || err < best$err ) best <- list( err = err, cv = cv, alpha = a )
   }
@@ -291,7 +291,7 @@ fit.age <- function( X, y, blocks, inner.folds, n.cov = 0L, bias = TRUE ) {
       fit <- glmnet::glmnet( apply.preprocess( ipp, X[ itr, , drop = FALSE ] ), y[ itr ],
                              family = "gaussian", alpha = best$alpha,
                              lambda = best$cv$lambda, standardize = FALSE,
-                             penalty.factor = pf, thresh = 1e-5 )
+                             penalty.factor = pf )
       inner.pred[ ite ] <- as.numeric( stats::predict(
         fit, apply.preprocess( ipp, X[ ite, , drop = FALSE ] ), s = lambda ) )
     }
